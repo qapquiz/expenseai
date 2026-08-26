@@ -9,13 +9,21 @@ import kotlinx.coroutines.withContext
 
 class GeminiManager {
     private val generativeModel = GenerativeModel(
-        modelName = "gemini-3-flash-preview", // Updated to the latest Gemini 3 model for August 2026
+        modelName = "gemma-4-31b-it", // Updated to the latest Gemini 3 model for August 2026
         apiKey = BuildConfig.GEMINI_API_KEY
     )
 
     private val jsonGenerativeModel = GenerativeModel(
-        modelName = "gemini-3-flash-preview",
+        modelName = "gemma-4-31b-it",
         apiKey = BuildConfig.GEMINI_API_KEY,
+        systemInstruction = content {
+            text("""
+                You are a strict JSON extraction assistant. 
+                Your output must always be of type: application/json.
+                Extract receipt data into a single JSON object with these keys: date, amount, merchantName, category, bankName, type.
+                Output ONLY raw JSON. Do not include any reasoning, commentary, or markdown formatting outside the JSON object.
+            """.trimIndent())
+        },
         generationConfig = com.google.ai.client.generativeai.type.generationConfig {
             responseMimeType = "application/json"
         }
@@ -26,12 +34,16 @@ class GeminiManager {
         return withContext(Dispatchers.IO) {
             val prompt = """
                 Extract the following information from this bank receipt image:
-                - Date (ISO format YYYY-MM-DD)
+                - Date (ISO format YYYY-MM-DD). If the year is in Thai Buddhist Era (e.g., 67, 68, 69), convert to AD (2024, 2025, 2026).
                 - Amount (Number only)
-                - Merchant Name
-                - Category (e.g., Food, Transport, Shopping, Bills)
+                - Merchant Name (The recipient name)
+                - Category (e.g., Food, Transport, Shopping, Bills, Travel)
                 - Bank Name (e.g., K-Plus, SCB, PromptPay)
-                - Type (Identify if this is an "EXPENSE" or "INCOME" based on whether money was sent or received)
+                - Type: Identify if this is "EXPENSE" or "INCOME" or "TRANSFER".
+                    * CRITICAL: Most Thai bank slips are EXPENSES.
+                    * If the action is "โอนเงินสำเร็จ" (Transfer), "เติมเงิน" (Top-up), or "ชำระเงิน" (Payment), it is an EXPENSE.
+                    * If the recipient name (receiver) is "อริยะ" or "Ariya", it is an "EXPENSE" (categorize as "TRANSFER").
+                    * Only use "INCOME" if the slip explicitly says "รับเงิน" (Received money).
                 
                 Return ONLY a JSON object with these keys: date, amount, merchantName, category, bankName, type.
             """.trimIndent()
@@ -42,7 +54,20 @@ class GeminiManager {
                     text(prompt)
                 }
                 val response = jsonGenerativeModel.generateContent(inputContent)
-                response.text
+                val rawText = response.text
+                
+                // Fallback: If the model still returns commentary, try to extract only the JSON part
+                if (rawText != null && !rawText.trim().startsWith("{")) {
+                    val firstBrace = rawText.indexOf("{")
+                    val lastBrace = rawText.lastIndexOf("}")
+                    if (firstBrace != -1 && lastBrace != -1 && lastBrace > firstBrace) {
+                        rawText.substring(firstBrace, lastBrace + 1)
+                    } else {
+                        rawText
+                    }
+                } else {
+                    rawText
+                }
             } catch (e: QuotaExceededException) {
                 throw e
             } catch (e: Exception) {
