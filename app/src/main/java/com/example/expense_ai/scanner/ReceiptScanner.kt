@@ -21,7 +21,8 @@ class ReceiptScanner(
         "K PLUS", "SCB EASY", "Krungthai NEXT", "Bangkok Bank", "ttb touch"
     )
 
-    suspend fun scanAndProcess() {
+    suspend fun scanAndProcess(onProgress: (suspend (String) -> Unit)? = null) {
+        onProgress?.invoke("Searching for bank receipts...")
         val projection = mutableListOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.BUCKET_DISPLAY_NAME,
@@ -58,54 +59,72 @@ class ReceiptScanner(
             val failed = expenseDao.getFailedImageIds().toSet()
             Log.d("ReceiptScanner", "Found ${cursor.count} total images in bank buckets. Failed count: ${failed.size}")
 
+            val imagesToProcess = mutableListOf<Triple<Long, String, String>>()
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
                 val imageId = id.toString()
-                val path = cursor.getString(dataColumn)
                 val bucket = cursor.getString(bucketColumn)
                 
-                val volume = if (volumeColumn != -1) cursor.getString(volumeColumn) else null
                 val isPending = if (pendingColumn != -1) cursor.getInt(pendingColumn) else 0
                 
-                Log.d("ReceiptScanner", "Checking imageId: $imageId, bucket: $bucket, volume: $volume, isPending: $isPending, path: $path")
+                if (imageId in failed || isPending == 1) continue
                 
-                if (imageId in failed) {
-                    Log.d("ReceiptScanner", "Skipping $imageId (previously failed)")
-                    continue
-                }
-
-                if (isPending == 1) {
-                    Log.d("ReceiptScanner", "Skipping $imageId (pending)")
-                    continue
-                }
-
                 if (!expenseDao.isFileProcessed(imageId)) {
-                    Log.d("ReceiptScanner", "Processing new image: $imageId")
-                    
-                    val contentUri = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q && volume != null) {
-                        MediaStore.Images.Media.getContentUri(volume)
-                    } else {
-                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-                    }
-                    val uri = ContentUris.withAppendedId(contentUri, id)
+                    imagesToProcess.add(Triple(id, imageId, bucket))
+                }
+            }
+            
+            if (imagesToProcess.isEmpty()) {
+                onProgress?.invoke("No new bank receipts found.")
+                return@use
+            }
 
-                    var retryCount = 0
-                    while (true) {
-                        try {
-                            processReceipt(uri, imageId, volume, path)
-                            // Delay to stay within free tier 15 RPM limit (approx 4 seconds per request)
-                            kotlinx.coroutines.delay(4000)
-                            break
-                        } catch (e: QuotaExceededException) {
-                            retryCount++
-                            if (retryCount < 3) {
-                                val waitTime = 10000L * retryCount
-                                Log.w("ReceiptScanner", "Quota exceeded for $imageId. Retry $retryCount/3 in ${waitTime/1000}s...")
-                                kotlinx.coroutines.delay(waitTime)
-                            } else {
-                                Log.e("ReceiptScanner", "Quota exceeded for $imageId after maximum retries. Aborting scan to retry later.")
-                                throw e
-                            }
+            Log.d("ReceiptScanner", "Total new images to process: ${imagesToProcess.size}")
+
+            imagesToProcess.forEachIndexed { index, (id, imageId, bucket) ->
+                Log.d("ReceiptScanner", "Processing image $index/${imagesToProcess.size}: $imageId")
+                onProgress?.invoke("Processing ${index + 1} of ${imagesToProcess.size} receipts...")
+
+                cursor.moveToPosition(-1) // Reset for query details if needed, but we have enough
+                // We need volume and path which are position dependent, let's find the row again
+                cursor.moveToPosition(-1)
+                var volume: String? = null
+                var path: String? = null
+                
+                // Re-find the row in cursor to get volume/path (simpler than storing all in Triple)
+                cursor.moveToFirst()
+                do {
+                    if (cursor.getLong(idColumn) == id) {
+                        volume = if (volumeColumn != -1) cursor.getString(volumeColumn) else null
+                        path = cursor.getString(dataColumn)
+                        break
+                    }
+                } while (cursor.moveToNext())
+                
+                val contentUri = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q && volume != null) {
+                    MediaStore.Images.Media.getContentUri(volume)
+                } else {
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                }
+                val uri = ContentUris.withAppendedId(contentUri, id)
+
+                var retryCount = 0
+                while (true) {
+                    try {
+                        processReceipt(uri, imageId, volume, path)
+                        // Delay to stay within free tier 15 RPM limit (approx 4 seconds per request)
+                        kotlinx.coroutines.delay(4000)
+                        break
+                    } catch (e: QuotaExceededException) {
+                        retryCount++
+                        if (retryCount < 3) {
+                            val waitTime = 10000L * retryCount
+                            Log.w("ReceiptScanner", "Quota exceeded for $imageId. Retry $retryCount/3 in ${waitTime/1000}s...")
+                            onProgress?.invoke("Rate limit reached. Retrying in ${waitTime/1000}s...")
+                            kotlinx.coroutines.delay(waitTime)
+                        } else {
+                            Log.e("ReceiptScanner", "Quota exceeded for $imageId after maximum retries. Aborting scan to retry later.")
+                            throw e
                         }
                     }
                 }

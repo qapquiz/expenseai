@@ -19,7 +19,9 @@ class ScanWorker(
         val scanner = ReceiptScanner(applicationContext, geminiManager, expenseDao)
 
         return try {
-            scanner.scanAndProcess()
+            scanner.scanAndProcess { status ->
+                setProgress(androidx.work.workDataOf("status" to status))
+            }
             Result.success()
         } catch (e: Exception) {
             Log.e("ScanWorker", "Scan failed on attempt $runAttemptCount", e)

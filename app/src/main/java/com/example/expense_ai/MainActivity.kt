@@ -23,16 +23,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import com.example.expense_ai.ui.theme.ExpenseaiTheme
 import kotlinx.coroutines.launch
 
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Row
@@ -49,11 +50,13 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import com.example.expense_ai.data.Expense
 import com.example.expense_ai.data.ExpenseDatabase
 import com.example.expense_ai.scanner.ReceiptScanner
+import kotlinx.coroutines.delay
 
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -88,9 +91,13 @@ fun ExpenseTrackerApp(geminiManager: GeminiManager, modifier: Modifier = Modifie
     val periodicWorkInfos by workManager.getWorkInfosForUniqueWorkFlow("periodic_receipt_scan")
         .collectAsState(initial = emptyList())
     
-    val isScanning = (scanWorkInfos + periodicWorkInfos).any { 
+    val isScanning = scanWorkInfos.any { 
         it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED 
-    }
+    } || periodicWorkInfos.any { it.state == WorkInfo.State.RUNNING }
+    val scanningStatus = (scanWorkInfos + periodicWorkInfos)
+        .find { it.state == WorkInfo.State.RUNNING }
+        ?.progress
+        ?.getString("status")
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -145,10 +152,19 @@ fun ExpenseTrackerApp(geminiManager: GeminiManager, modifier: Modifier = Modifie
             enabled = !isScanning,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(if (isScanning) "Scanning in Background..." else "Scan Bank Receipts Now")
+            // Status lives inside the button (a fixed-size slot) so showing scan
+            // progress never pushes the content below it around. The label is
+            // throttled so rapid WorkManager progress updates don't flicker it.
+            val buttonLabel = rememberThrottledText(
+                scanningStatus
+                    ?: if (isScanning) "Scanning in Background..." else "Scan Bank Receipts Now"
+            )
+            Text(
+                text = buttonLabel,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
-// ...
-// ... rest of the UI ...
 
         Spacer(modifier = Modifier.height(16.dp))
         Text(text = "Expenses", style = androidx.compose.material3.MaterialTheme.typography.headlineSmall)
@@ -163,6 +179,26 @@ fun ExpenseTrackerApp(geminiManager: GeminiManager, modifier: Modifier = Modifie
             }
         }
     }
+}
+
+/**
+ * Throttles rapid text changes: at most one update per [intervalMs] (leading edge),
+ * with a trailing delay so the latest value always lands. Updates arriving faster
+ * than the window never reach the UI, preventing label flicker.
+ */
+@Composable
+fun rememberThrottledText(source: String, intervalMs: Long = 500L): String {
+    var display by remember { mutableStateOf(source) }
+    var lastAppliedAt by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(source) {
+        if (source == display) return@LaunchedEffect
+        val elapsed = SystemClock.elapsedRealtime() - lastAppliedAt
+        if (elapsed < intervalMs) delay(intervalMs - elapsed)
+        lastAppliedAt = SystemClock.elapsedRealtime()
+        display = source
+    }
+    return display
 }
 
 @Composable
