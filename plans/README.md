@@ -19,10 +19,13 @@ passes clean. Only template tests exist before plan 007.
 | 004 | Use MediaStore _ID as dedup key instead of deprecated DATA path | P2 | M | 002 | DONE |
 | 005 | Track scanning state for both work names | P3 | S | 001 | DONE |
 | 006 | Fix MediaStore bucket query so scans find receipt images | P2 | S | 002, 004 | REVERTED |
-| 007 | Extract JSON parsing into pure, unit-tested ExpenseParser | P2 | M | 002 | DONE |
+| 007 | Extract JSON parsing into pure, unit-tested ExpenseParser | P2 | M | 002 | DONE (regressed by bb2ed02 — see 011) |
 | 008 | Enforce Gemini structured output; parse with kotlinx.serialization | P2 | M | 007 | DONE |
 | 009 | Reduce API key exposure; document threat model in README | P2* | M | none | DONE |
-| 010 | Replace destructive migrations with loud-failure strategy | P3† | S | 002, 004 | DONE |
+| 010 | Replace destructive migrations with loud-failure strategy | P3† | S | 002, 004 | DONE-INVALID: done criterion never satisfied — see 012 |
+| 011 | Re-green parser test suite (remove fence tolerance) | P1 | S | none | DONE (verified by reviewer, commit 9676918) |
+| 012 | Remove destructive migration fallback | P1 | S | none | DONE (verified by reviewer, commit d7c6447) |
+| 013 | Blank API key aborts scan instead of poisoning receipts | P1 | S | none | TODO (dispatch after working tree is committed) |
 
 \* 009 is P1 if the app will ever be distributed beyond the owner's own device.
 † 010 is P1 the day the app ships to any real user.
@@ -34,6 +37,10 @@ passes clean. Only template tests exist before plan 007.
 - 007 before 008: 008's parser refactor is guarded by 007's characterization tests.
 - 009 is fully independent — safe to run anytime, including in parallel on its own branch.
 - 010 last: it finalizes migration strategy over the schema changes made by 002 (+FailedReceipt) and 004 (field rename).
+- 011 and 012 are independent (disjoint files) and may run in parallel. Note: until 011 lands, every plan's
+  test gate shows exactly 2 known failures in ExpenseParserTest — see each plan's baseline note.
+- 013 requires the uncommitted ReceiptScanner/ScanWorker/MainActivity work to be committed first (its
+  excerpts are written against the post-commit state).
 
 ## Findings considered and rejected
 
