@@ -8,6 +8,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class GeminiManager {
+    val isConfigured: Boolean
+        get() = BuildConfig.GEMINI_API_KEY.isNotBlank()
+
     private val generativeModel = GenerativeModel(
         modelName = "gemma-4-31b-it", // Updated to the latest Gemini 3 model for August 2026
         apiKey = BuildConfig.GEMINI_API_KEY
@@ -30,7 +33,7 @@ class GeminiManager {
     )
 
     suspend fun extractExpenseData(bitmap: Bitmap): String? {
-        if (BuildConfig.GEMINI_API_KEY.isBlank()) return "Gemini API key is not configured. Add GEMINI_API_KEY=<key> to local.properties (debug builds only)."
+        if (!isConfigured) return null
         return withContext(Dispatchers.IO) {
             val prompt = """
                 Extract the following information from this bank receipt image:

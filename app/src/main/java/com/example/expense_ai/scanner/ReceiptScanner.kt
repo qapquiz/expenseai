@@ -22,6 +22,11 @@ class ReceiptScanner(
     )
 
     suspend fun scanAndProcess(onProgress: (suspend (String) -> Unit)? = null) {
+        if (!geminiManager.isConfigured) {
+            Log.e("ReceiptScanner", "Gemini API key is not configured — scan aborted")
+            onProgress?.invoke("Gemini API key is not configured — scan aborted")
+            return
+        }
         onProgress?.invoke("Searching for bank receipts...")
         val projection = mutableListOf(
             MediaStore.Images.Media._ID,
