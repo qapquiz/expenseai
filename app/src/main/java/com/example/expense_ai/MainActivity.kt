@@ -36,6 +36,13 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
@@ -118,7 +125,14 @@ fun ExpenseTrackerApp(geminiManager: GeminiManager, modifier: Modifier = Modifie
         }
     }
 
-    Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .windowInsetsPadding(
+                WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+            )
+            .padding(16.dp)
+    ) {
         Button(
             onClick = {
                 val scanRequest = OneTimeWorkRequestBuilder<ScanWorker>().build()
@@ -140,7 +154,10 @@ fun ExpenseTrackerApp(geminiManager: GeminiManager, modifier: Modifier = Modifie
         Text(text = "Expenses", style = androidx.compose.material3.MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.height(8.dp))
 
-        LazyColumn(modifier = Modifier.weight(1f)) {
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            contentPadding = WindowInsets.navigationBars.asPaddingValues()
+        ) {
             items(expenses) { expense ->
                 ExpenseItem(expense)
             }
