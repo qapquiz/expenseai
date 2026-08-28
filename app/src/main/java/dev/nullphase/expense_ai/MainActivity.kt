@@ -1,4 +1,4 @@
-package com.example.expense_ai
+package dev.nullphase.expense_ai
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -27,7 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
-import com.example.expense_ai.ui.theme.ExpenseaiTheme
+import dev.nullphase.expense_ai.ui.theme.ExpenseaiTheme
 import kotlinx.coroutines.launch
 
 import android.Manifest
@@ -53,9 +53,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
-import com.example.expense_ai.data.Expense
-import com.example.expense_ai.data.ExpenseDatabase
-import com.example.expense_ai.scanner.ReceiptScanner
+import dev.nullphase.expense_ai.data.Expense
+import dev.nullphase.expense_ai.data.ExpenseDatabase
+import dev.nullphase.expense_ai.scanner.ReceiptScanner
 import kotlinx.coroutines.delay
 
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -63,7 +63,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import com.example.expense_ai.scanner.ScanWorker
+import dev.nullphase.expense_ai.scanner.ScanWorker
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {

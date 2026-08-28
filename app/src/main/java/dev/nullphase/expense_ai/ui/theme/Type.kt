@@ -1,4 +1,4 @@
-package com.example.expense_ai.ui.theme
+package dev.nullphase.expense_ai.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

@@ -1,4 +1,4 @@
-package com.example.expense_ai.data
+package dev.nullphase.expense_ai.data
 
 import android.content.Context
 import androidx.room.Database

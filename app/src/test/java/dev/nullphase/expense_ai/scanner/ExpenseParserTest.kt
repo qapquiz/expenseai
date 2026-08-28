@@ -1,4 +1,4 @@
-package com.example.expense_ai.scanner
+package dev.nullphase.expense_ai.scanner
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

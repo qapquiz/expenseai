@@ -1,11 +1,11 @@
-package com.example.expense_ai.scanner
+package dev.nullphase.expense_ai.scanner
 
 import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.expense_ai.GeminiManager
-import com.example.expense_ai.data.ExpenseDatabase
+import dev.nullphase.expense_ai.GeminiManager
+import dev.nullphase.expense_ai.data.ExpenseDatabase
 
 class ScanWorker(
     context: Context,

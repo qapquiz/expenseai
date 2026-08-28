@@ -1,4 +1,4 @@
-package com.example.expense_ai.ui.theme
+package dev.nullphase.expense_ai.ui.theme
 
 import android.app.Activity
 import android.os.Build

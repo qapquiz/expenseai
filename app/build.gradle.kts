@@ -8,13 +8,13 @@ plugins {
 }
 
 android {
-    namespace = "com.example.expense_ai"
+    namespace = "dev.nullphase.expense_ai"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.example.expense_ai"
+        applicationId = "dev.nullphase.expense_ai"
         minSdk = 24
         targetSdk = 37
         versionCode = 1

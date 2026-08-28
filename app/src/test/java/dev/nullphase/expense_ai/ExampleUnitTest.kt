@@ -1,4 +1,4 @@
-package com.example.expense_ai
+package dev.nullphase.expense_ai
 
 import org.junit.Test
 

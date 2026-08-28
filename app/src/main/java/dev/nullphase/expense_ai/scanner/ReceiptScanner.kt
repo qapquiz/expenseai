@@ -1,4 +1,4 @@
-package com.example.expense_ai.scanner
+package dev.nullphase.expense_ai.scanner
 
 import android.content.ContentUris
 import android.content.Context
@@ -6,10 +6,10 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.provider.MediaStore
 import android.util.Log
-import com.example.expense_ai.GeminiManager
-import com.example.expense_ai.data.Expense
-import com.example.expense_ai.data.ExpenseDao
-import com.example.expense_ai.data.FailedReceipt
+import dev.nullphase.expense_ai.GeminiManager
+import dev.nullphase.expense_ai.data.Expense
+import dev.nullphase.expense_ai.data.ExpenseDao
+import dev.nullphase.expense_ai.data.FailedReceipt
 import com.google.ai.client.generativeai.type.QuotaExceededException
 
 class ReceiptScanner(
