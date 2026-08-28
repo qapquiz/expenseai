@@ -25,7 +25,7 @@ passes clean. Only template tests exist before plan 007.
 | 010 | Replace destructive migrations with loud-failure strategy | P3† | S | 002, 004 | DONE-INVALID: done criterion never satisfied — see 012 |
 | 011 | Re-green parser test suite (remove fence tolerance) | P1 | S | none | DONE (verified by reviewer, commit 9676918) |
 | 012 | Remove destructive migration fallback | P1 | S | none | DONE (verified by reviewer, commit d7c6447) |
-| 013 | Blank API key aborts scan instead of poisoning receipts | P1 | S | none | TODO (dispatch after working tree is committed) |
+| 013 | Blank API key aborts scan instead of poisoning receipts | P1 | S | none | DONE (verified by reviewer, commit 8422570) |
 
 \* 009 is P1 if the app will ever be distributed beyond the owner's own device.
 † 010 is P1 the day the app ships to any real user.
