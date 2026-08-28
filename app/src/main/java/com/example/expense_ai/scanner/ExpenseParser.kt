@@ -17,19 +17,8 @@ object ExpenseParser {
     /** Returns null when the input cannot be parsed into an Expense draft. */
     fun parse(responseText: String): ParsedExpense? {
         return try {
-            var cleaned = responseText.trim()
-            
-            // Handle markdown code blocks if the model insists on using them
-            if (cleaned.startsWith("```")) {
-                cleaned = cleaned.substringAfter("\n").substringBeforeLast("```").trim()
-                // Some models put "json" after the first triple-backtick
-                if (cleaned.startsWith("json", ignoreCase = true)) {
-                    cleaned = cleaned.removePrefix("json").trim()
-                }
-            }
-
             val draft = Json { ignoreUnknownKeys = true }
-                .decodeFromString(ExpenseDraft.serializer(), cleaned)
+                .decodeFromString(ExpenseDraft.serializer(), responseText.trim())
             ParsedExpense(
                 date = draft.date,
                 amount = draft.amount,
