@@ -35,19 +35,24 @@ class GeminiManager {
     suspend fun extractExpenseData(bitmap: Bitmap): String? {
         if (!isConfigured) return null
         return withContext(Dispatchers.IO) {
+            val categoryList = Categories.ALL.joinToString(", ") { "\"$it\"" }
+            val ownerHint = BuildConfig.OWNER_NAME_HINT.trim().takeIf { it.isNotBlank() }
+                ?.let { "\n    * The user is: $it. Transfers where the sender or recipient matches this are TRANSFER." }
+                ?: ""
+
             val prompt = """
                 Extract the following information from this bank receipt image:
                 - Date (ISO format YYYY-MM-DD). If the year is in Thai Buddhist Era (e.g., 67, 68, 69), convert to AD (2024, 2025, 2026).
                 - Amount (Number only)
                 - Merchant Name (The recipient name)
-                - Category (e.g., Food, Transport, Shopping, Bills, Travel)
+                - Category: choose EXACTLY ONE of $categoryList.
                 - Bank Name (e.g., K-Plus, SCB, PromptPay)
                 - Type: Identify if this is "EXPENSE" or "INCOME" or "TRANSFER".
-                    * CRITICAL: Most Thai bank slips are EXPENSES.
-                    * If the action is "โอนเงินสำเร็จ" (Transfer), "เติมเงิน" (Top-up), or "ชำระเงิน" (Payment), it is an EXPENSE.
-                    * If the recipient name (receiver) is "อริยะ" or "Ariya", it is an "EXPENSE" (categorize as "TRANSFER").
-                    * Only use "INCOME" if the slip explicitly says "รับเงิน" (Received money).
-                
+                    * TRANSFER: money moved between the user's OWN accounts (sender and recipient are the same person).
+                    * EXPENSE: money went to anyone else, including "โอนเงินสำเร็จ" (Transfer), "เติมเงิน" (Top-up), or "ชำระเงิน" (Payment) to third parties. Most Thai bank slips are EXPENSES.
+                    * INCOME: only if the slip explicitly says "รับเงิน" (Received money) from someone else.
+                    * Sender and receiver may be written in different scripts (Thai vs romanized English). Treat plausible transliterations of the same name as the same person.$ownerHint
+
                 Return ONLY a JSON object with these keys: date, amount, merchantName, category, bankName, type.
             """.trimIndent()
 

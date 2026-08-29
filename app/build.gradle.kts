@@ -31,12 +31,14 @@ android {
                 properties.load(localPropertiesFile.inputStream())
             }
             buildConfigField("String", "GEMINI_API_KEY", "\"${properties.getProperty("GEMINI_API_KEY") ?: ""}\"")
+            buildConfigField("String", "OWNER_NAME_HINT", "\"${properties.getProperty("OWNER_NAME_HINT") ?: ""}\"")
         }
         release {
             optimization {
                 enable = false
             }
             buildConfigField("String", "GEMINI_API_KEY", "\"\"")
+            buildConfigField("String", "OWNER_NAME_HINT", "\"\"")
         }
     }
     buildFeatures {

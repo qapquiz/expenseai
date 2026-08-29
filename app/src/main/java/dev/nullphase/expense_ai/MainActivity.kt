@@ -36,7 +36,13 @@ import android.os.Build
 import android.os.SystemClock
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
@@ -47,10 +53,15 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import dev.nullphase.expense_ai.data.Expense
@@ -85,6 +96,8 @@ fun ExpenseTrackerApp(geminiManager: GeminiManager, modifier: Modifier = Modifie
     val expenseDao = database.expenseDao()
     
     val expenses by expenseDao.getAllExpenses().collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
+    var selectedExpense by remember { mutableStateOf<Expense?>(null) }
     val workManager = remember { WorkManager.getInstance(context) }
     val scanWorkInfos by workManager.getWorkInfosForUniqueWorkFlow("receipt_scan")
         .collectAsState(initial = emptyList())
@@ -175,8 +188,23 @@ fun ExpenseTrackerApp(geminiManager: GeminiManager, modifier: Modifier = Modifie
             contentPadding = WindowInsets.navigationBars.asPaddingValues()
         ) {
             items(expenses) { expense ->
-                ExpenseItem(expense)
+                ExpenseItem(expense, onClick = { selectedExpense = expense })
             }
+        }
+
+        selectedExpense?.let { selected ->
+            CategoryPickerSheet(
+                expense = selected,
+                onDismiss = { selectedExpense = null },
+                onSelectCategory = { category ->
+                    scope.launch { expenseDao.updateCategory(selected.id, category) }
+                    selectedExpense = null
+                },
+                onConvertType = { newType ->
+                    scope.launch { expenseDao.updateTypeAndCategory(selected.id, newType, "") }
+                    selectedExpense = null
+                }
+            )
         }
     }
 }
@@ -202,7 +230,7 @@ fun rememberThrottledText(source: String, intervalMs: Long = 500L): String {
 }
 
 @Composable
-fun ExpenseItem(expense: Expense) {
+fun ExpenseItem(expense: Expense, onClick: () -> Unit) {
     val amountColor = if (expense.type == "INCOME") {
         androidx.compose.ui.graphics.Color(0xFF4CAF50) // Green
     } else {
@@ -210,7 +238,15 @@ fun ExpenseItem(expense: Expense) {
     }
     val amountPrefix = if (expense.type == "INCOME") "+" else "-"
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable(
+                enabled = expense.type == "EXPENSE" || expense.type == "TRANSFER",
+                onClick = onClick
+            )
+    ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween) {
                 Text(text = expense.merchantName, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
@@ -220,8 +256,73 @@ fun ExpenseItem(expense: Expense) {
                     color = amountColor
                 )
             }
-            Text(text = "${expense.bankName} • ${expense.category} • ${expense.type}", style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
+            val subtitle = listOf(expense.bankName, expense.category, expense.type)
+                .filter { it.isNotBlank() }
+                .joinToString(" • ")
+            Text(text = subtitle, style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
             Text(text = expense.date, style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+/**
+ * Bottom sheet for manual classification of one expense row.
+ *
+ * EXPENSE rows: 9 category chips (instant commit on tap) + convert-to-TRANSFER
+ * action. TRANSFER rows: chips hidden, only convert-back-to-EXPENSE (category
+ * is cleared on conversion — transfers carry no spending category). INCOME
+ * rows never reach this sheet (cards are not clickable).
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun CategoryPickerSheet(
+    expense: Expense,
+    onDismiss: () -> Unit,
+    onSelectCategory: (String) -> Unit,
+    onConvertType: (String) -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp)
+        ) {
+            Text(text = expense.merchantName, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+            if (expense.type == "EXPENSE") {
+                Spacer(modifier = Modifier.height(12.dp))
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Categories.ALL.forEach { category ->
+                        FilterChip(
+                            selected = expense.category == category,
+                            onClick = { onSelectCategory(category) },
+                            label = { Text(category) }
+                        )
+                    }
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable {
+                        onConvertType(if (expense.type == "EXPENSE") "TRANSFER" else "EXPENSE")
+                    }
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "⇄", style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = if (expense.type == "EXPENSE") "This was a transfer between my own accounts"
+                    else "This is actually an expense",
+                    style = androidx.compose.material3.MaterialTheme.typography.bodyMedium
+                )
+            }
         }
     }
 }
