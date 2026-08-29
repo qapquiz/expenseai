@@ -14,13 +14,22 @@ private fun loadLocalProperties(): Properties {
 }
 
 /** Escape a property value for embedding inside the generated Java string
- *  literal of BuildConfig (quotes/backslashes/newlines would otherwise break
- *  or corrupt the generated source). */
-private fun escapeForBuildConfig(value: String): String =
-    value.replace("\\", "\\\\")
-        .replace("\"", "\\\"")
-        .replace("\r", "\\r")
-        .replace("\n", "\\n")
+ *  literal of BuildConfig (quotes/backslashes/newlines/non-ASCII would
+ *  otherwise break or corrupt the generated source). */
+private fun escapeForBuildConfig(value: String): String {
+    val sb = StringBuilder()
+    for (c in value) {
+        when (c) {
+            '\\' -> sb.append("\\\\")
+            '\"' -> sb.append("\\\"")
+            '\r' -> sb.append("\\r")
+            '\n' -> sb.append("\\n")
+            in '\u0020'..'\u007E' -> sb.append(c)
+            else -> sb.append("\\u%04x".format(c.code))
+        }
+    }
+    return sb.toString()
+}
 
 plugins {
     alias(libs.plugins.android.application)
