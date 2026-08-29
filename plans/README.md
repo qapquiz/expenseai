@@ -26,6 +26,7 @@ passes clean. Only template tests exist before plan 007.
 | 011 | Re-green parser test suite (remove fence tolerance) | P1 | S | none | DONE (verified by reviewer, commit 9676918) |
 | 012 | Remove destructive migration fallback | P1 | S | none | DONE (verified by reviewer, commit d7c6447) |
 | 013 | Blank API key aborts scan instead of poisoning receipts | P1 | S | none | DONE (verified by reviewer, commit 8422570) |
+| 014 | Manual category picker; EXPENSE↔TRANSFER correction; Gemini taxonomy + owner-name hint | P2 | M | none | DONE (verified on emulator, commit c23ce9a) |
 
 \* 009 is P1 if the app will ever be distributed beyond the owner's own device.
 † 010 is P1 the day the app ships to any real user.
@@ -41,6 +42,12 @@ passes clean. Only template tests exist before plan 007.
   test gate shows exactly 2 known failures in ExpenseParserTest — see each plan's baseline note.
 - 013 requires the uncommitted ReceiptScanner/ScanWorker/MainActivity work to be committed first (its
   excerpts are written against the post-commit state).
+- 014 is independent of 001–013 (all DONE). After deploying 014, operator should wipe + reinstall
+  ONCE to regenerate all rows under the new prompt (see 014 Maintenance notes) — this must happen
+  before hand-correcting categories, or the wipe destroys manual work.
+- Future summary feature must inherit 014's rules: spend = type 'EXPENSE' only; income =
+  type 'INCOME' only; TRANSFER excluded (net-zero self-movement); off-list categories roll up to
+  "Other" at query time.
 
 ## Findings considered and rejected
 
