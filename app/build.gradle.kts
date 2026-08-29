@@ -1,5 +1,27 @@
 import java.util.Properties
 
+/** Properties.load(InputStream) decodes ISO-8859-1 by spec — read as UTF-8
+ *  instead so OWNER_NAME_HINT can contain Thai (and any non-Latin script). */
+private fun loadLocalProperties(): Properties {
+    val properties = Properties()
+    val localPropertiesFile = project.rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { stream ->
+            properties.load(stream.reader(Charsets.UTF_8))
+        }
+    }
+    return properties
+}
+
+/** Escape a property value for embedding inside the generated Java string
+ *  literal of BuildConfig (quotes/backslashes/newlines would otherwise break
+ *  or corrupt the generated source). */
+private fun escapeForBuildConfig(value: String): String =
+    value.replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\r", "\\r")
+        .replace("\n", "\\n")
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -25,13 +47,9 @@ android {
 
     buildTypes {
         debug {
-            val properties = Properties()
-            val localPropertiesFile = project.rootProject.file("local.properties")
-            if (localPropertiesFile.exists()) {
-                properties.load(localPropertiesFile.inputStream())
-            }
-            buildConfigField("String", "GEMINI_API_KEY", "\"${properties.getProperty("GEMINI_API_KEY") ?: ""}\"")
-            buildConfigField("String", "OWNER_NAME_HINT", "\"${properties.getProperty("OWNER_NAME_HINT") ?: ""}\"")
+            val properties = loadLocalProperties()
+            buildConfigField("String", "GEMINI_API_KEY", "\"${escapeForBuildConfig(properties.getProperty("GEMINI_API_KEY") ?: "")}\"")
+            buildConfigField("String", "OWNER_NAME_HINT", "\"${escapeForBuildConfig(properties.getProperty("OWNER_NAME_HINT") ?: "")}\"")
         }
         release {
             optimization {
