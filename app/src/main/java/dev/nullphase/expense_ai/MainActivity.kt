@@ -51,7 +51,6 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -75,6 +74,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import dev.nullphase.expense_ai.scanner.ScanWorker
+import java.util.Calendar
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
@@ -183,12 +184,20 @@ fun ExpenseTrackerApp(geminiManager: GeminiManager, modifier: Modifier = Modifie
         Text(text = "Expenses", style = androidx.compose.material3.MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.height(8.dp))
 
+        val listItems = remember(expenses) { groupExpensesByDate(expenses) }
         LazyColumn(
             modifier = Modifier.weight(1f),
             contentPadding = WindowInsets.navigationBars.asPaddingValues()
         ) {
-            items(expenses) { expense ->
-                ExpenseItem(expense, onClick = { selectedExpense = expense })
+            listItems.forEachIndexed { index, listItem ->
+                when (listItem) {
+                    is ExpenseListItem.Header -> item(key = index) {
+                        DateHeader(label = listItem.label, expenseTotal = listItem.expenseTotal)
+                    }
+                    is ExpenseListItem.Row -> item(key = index) {
+                        ExpenseItem(listItem.expense, onClick = { selectedExpense = listItem.expense })
+                    }
+                }
             }
         }
 
@@ -323,6 +332,85 @@ fun CategoryPickerSheet(
                     style = androidx.compose.material3.MaterialTheme.typography.bodyMedium
                 )
             }
+        }
+    }
+}
+
+/** Flat list model for the grouped LazyColumn: a header before each date group. */
+private sealed interface ExpenseListItem {
+    data class Header(val label: String, val expenseTotal: Double) : ExpenseListItem
+    data class Row(val expense: Expense) : ExpenseListItem
+}
+
+private val SHORT_MONTHS = arrayOf(
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+)
+
+/** Groups the date-sorted expense list into [header, rows...] sequences.
+ *  Input MUST be sorted by date DESC (guaranteed by the ExpenseDao query);
+ *  groupBy preserves first-encounter key order. Blank dates sort last and
+ *  render under "Unknown date". Header totals sum EXPENSE rows only:
+ *  TRANSFER is net-zero self-movement, INCOME is not spending (plan 014 rules). */
+private fun groupExpensesByDate(expenses: List<Expense>): List<ExpenseListItem> {
+    val listItems = mutableListOf<ExpenseListItem>()
+    for ((date, rows) in expenses.groupBy { it.date }) {
+        val expenseTotal = rows.filter { it.type == "EXPENSE" }.sumOf { it.amount }
+        listItems += ExpenseListItem.Header(headerLabel(date), expenseTotal)
+        rows.forEach { listItems += ExpenseListItem.Row(it) }
+    }
+    return listItems
+}
+
+/** Today / Yesterday / "28 Aug 2026"; blank dates -> "Unknown date"; drifted
+ *  or unparseable date strings render raw (honest-display rule, plan 014). */
+private fun headerLabel(date: String): String {
+    if (date.isBlank()) return "Unknown date"
+    val parts = date.split("-")
+    if (parts.size != 3) return date
+    val year = parts[0].toIntOrNull() ?: return date
+    val month = parts[1].toIntOrNull() ?: return date
+    val day = parts[2].toIntOrNull() ?: return date
+    if (month !in 1..12 || day !in 1..31) return date
+    val ymd = String.format(Locale.US, "%04d-%02d-%02d", year, month, day)
+    return when (ymd) {
+        calendarYmd(0) -> "Today"
+        calendarYmd(1) -> "Yesterday"
+        else -> String.format(Locale.US, "%d %s %d", day, SHORT_MONTHS[month - 1], year)
+    }
+}
+
+/** Local date as YYYY-MM-DD, [daysBack] days ago (Calendar, not java.time:
+ *  minSdk 24 < 26 and no core-library desugaring). */
+private fun calendarYmd(daysBack: Int): String {
+    val calendar = Calendar.getInstance()
+    calendar.add(Calendar.DAY_OF_YEAR, -daysBack)
+    return String.format(
+        Locale.US,
+        "%04d-%02d-%02d",
+        calendar.get(Calendar.YEAR),
+        calendar.get(Calendar.MONTH) + 1,
+        calendar.get(Calendar.DAY_OF_MONTH)
+    )
+}
+
+/** Date-group header: label on the left, the day's EXPENSE total in red on the
+ *  right (hidden when zero — e.g. a group containing only transfers/income). */
+@Composable
+fun DateHeader(label: String, expenseTotal: Double) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(text = label, style = androidx.compose.material3.MaterialTheme.typography.titleSmall)
+        if (expenseTotal > 0.0) {
+            Text(
+                text = String.format(Locale.US, "-฿%.2f", expenseTotal),
+                style = androidx.compose.material3.MaterialTheme.typography.titleSmall,
+                color = androidx.compose.ui.graphics.Color(0xFFF44336)
+            )
         }
     }
 }

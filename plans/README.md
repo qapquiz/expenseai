@@ -27,6 +27,7 @@ passes clean. Only template tests exist before plan 007.
 | 012 | Remove destructive migration fallback | P1 | S | none | DONE (verified by reviewer, commit d7c6447) |
 | 013 | Blank API key aborts scan instead of poisoning receipts | P1 | S | none | DONE (verified by reviewer, commit 8422570) |
 | 014 | Manual category picker; EXPENSE↔TRANSFER correction; Gemini taxonomy + owner-name hint | P2 | M | none | DONE (verified on emulator, commit c23ce9a) |
+| 015 | Group expense list by date with daily EXPENSE-only totals | P2 | S | 014 | DONE (verified on emulator, 2026-08-29) |
 
 \* 009 is P1 if the app will ever be distributed beyond the owner's own device.
 † 010 is P1 the day the app ships to any real user.
